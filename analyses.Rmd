@@ -1,0 +1,3245 @@
+---
+title: "R Code meta-analysis energy"
+bibliography: "config/Energy_Meta.bib"
+csl: "config/apa.csl"
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+  include: true
+prefer-html: true
+author: "Anne-Kathrin Kleine"
+output: 
+  word_document:
+    reference_docx: "config/template_word.docx"
+  #html_document:
+    #toc: true
+    #toc-depth: 3
+    #toc_float: true
+    #toc_collapsed: true
+    #number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = TRUE, echo = FALSE, warning = FALSE, include = TRUE)
+```
+
+```{r, eval = TRUE}
+# Read in data and preparation
+library(tidyverse)
+library(psychmeta)
+library(readxl)
+library(flextable)
+
+db <- read_excel("Codebook/Coding Metaanalysis_AK_280223_new.xlsx") # load codesheet
+
+cols.num <- c("Filter_Full paper (1 = excl; 2 = incl)", "Year...24", "Sample number", 
+              "Moderator_Energymeasure_Predictor x - scale code", 
+              "Predictor x_number items",
+              "Criterion y _Category1",
+              "Criterion y_specific concept category2",
+              "Rxx_Predictor", "Ryy_Criterion", "Rxy", "SD_x",
+              "SD_y", "N_Sample Size", "Moderator Study design_code",
+              "Age_Mean", "Age_SD",
+              "Gender (% male)") 
+db[cols.num] <- sapply(db[cols.num],as.numeric) # make some cols numeric
+
+source("R/custom-functions.R")
+
+db <- db %>% filter(`Filter_Full paper (1 = excl; 2 = incl)` == 2)
+```
+
+# Descriptives
+
+```{r}
+options(scipen=999)
+db <- db %>% mutate(scale_energy_moderator = 
+                      ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 1, "SMVM",
+                             ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 2, "UWES",
+                                    ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 3, "SVS",
+                                           ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 4, "Other", 
+                                                  NA)))))
+```
+
+```{r}
+overall_k <- nrow(count(db, Number))
+db_red <- db[!duplicated(db[,'Number' ]),]
+
+overall_N <- sum(db_red$`N_Sample Size`, na.rm = T)
+```
+
+Overall *k* = `r overall_k`; Overall *N* = `r overall_N`.
+
+```{r}
+flextable(count(db, scale_energy_moderator))
+```
+
+```{r}
+range_low <- range(db$`N_Sample Size`, na.rm = T)[1]
+range_high <- range(db$`N_Sample Size`, na.rm = T)[2]
+mean_N <- round(mean(db$`N_Sample Size`, na.rm = T), 0)
+sd_N <- round(sd(db$`N_Sample Size`, na.rm = T), 0)
+```
+
+Sample sizes ranged between `r range_low` and `r range_high` (*M* = `r mean_N`, *SD* = `r sd_N`). 
+
+```{r}
+mean_age <- round(mean(db$Age_Mean, na.rm = T), 2)
+
+sd_age <- round(sd(db$Age_Mean, na.rm = T), 2)
+```
+
+The mean age across studies was *M* = `r mean_age` (*SD* = `r sd_age`). 
+
+```{r}
+mean_male <- round(mean(db$`Gender (% male)`, na.rm = T), 2)
+sd_male <- round(sd(db$`Gender (% male)`, na.rm = T), 2)
+```
+
+The mean percentage of male study participants across all studies was `r mean_male` (*SD* = `r sd_male`)
+
+```{r}
+library(hunspell)
+
+db_red <- db[!duplicated(db[,'Number' ]),]
+
+clean_country <- na.omit(db_red$Country) %>% cleantext(.)
+
+clean_country <- gsub("66.4% German, 21.5% Swiss, 12.1% Other", "various", clean_country)
+clean_country <- gsub("Afrikaans", "South Africa", clean_country)
+clean_country <- gsub("Dutch", "Netherlands", clean_country)
+clean_country <- gsub("German and Netherlands", "various", clean_country)
+clean_country <- gsub("Germany/Austria", "various", clean_country)
+clean_country <- gsub("likely France", "France", clean_country)
+clean_country <- gsub("North America", "USA", clean_country)
+clean_country <- gsub("South African", "South Africa", clean_country)
+clean_country <- gsub("Scandinavian Countries", "various", clean_country)
+clean_country <- gsub("Sweden, Poland, Italy", "various", clean_country)
+clean_country <- gsub("United States", "USA", clean_country)
+clean_country <- gsub("Wonderland", "various", clean_country)
+clean_country <- gsub("Belgian", "Belgium", clean_country)
+
+flextable(data.frame(table(clean_country)[order(table(clean_country),decreasing = TRUE)]))
+
+```
+
+
+
+# Data analysis 
+
+## Bivariate relationships 
+
+We conducted a meta-analysis to examine the relationship between energy and the variables included in our theoretical model (Figure X). We calculated sample-weighted correlations to account for sampling error and corrected for measurement error by considering lack of perfect reliability [@schmidt_hunter23]. We reported both sample size weighted (*r*) and sample size-weighted and reliability-corrected correlations ($r_c$) along with their 95% confidence intervals. We used only one effect size for a relationship between energy and an antecedent/outcome variable per independent sample to ensure the independence of effect size estimates. We averaged scores for studies reporting associations between energy and multiple variables belonging to the same construct. To examine heterogeneity in the obtained estimates, we computed 80% credibility intervals for ($r_c$). A wide credibility interval indicates potential moderators may be present [@wiernik_kostal_wilmot_dilchert_ones_2017]. To interpret the correlation estimates, we followed the recommendations by [@wiernik_kostal_wilmot_dilchert_ones_2017] for overall effect sizes in organizational psychology research and considered ($r_c$) < .15 as negligible, ($r_c$) ≥ .15 as weak, ($r_c$) ≥ .25 as moderate, and ($r_c$) ≥ .39 as strong. All bivariate analyses were conducted using the *psychmeta* package [@dahlke_wiernik19] for the R statistical computing environment [@rcoreteam22b]. We also tested for moderation by the energy scale used, study design (cross-sectional vs. longitudinal vs. daily diary), and the rater (self-rated vs. other-rated vs. other) for performance. Moderator analyses were conducted for each moderator category that was present in *k* > 1 independent samples, using the *metafor* package [@viechtbauer10] for the R statistical computing environment [@rcoreteam22b].
+
+## Publication bias and sensitivity analyses
+
+To assess whether studies with lower precision could substantially alter the results of meta-analytic analyses, we conducted cumulative meta-analysis [@borenstein2021introduction]. This method involves a series of iterative meta-analyses in which a single effect size for a specific relationship is added at a time in decreasing order of precision. The effect sizes that are added first represent the most precise estimates of the population effect size. If studies with lower precision are found to bias the meta-analytic estimates, the cumulative results will drift as less precise studies are added [@borenstein2021introduction].
+
+
+# Individually corrected meta-analysis
+
+```{r}
+# 1) Job and organizational resources
+# 2) demands and stressors
+# 3) personal resources
+# 4) Work-related attitudes
+# 5) positive well-being
+# 6) negative well-being
+# 7) job performance
+# 8) Negative work-related intentions and behaviors
+```
+
+```{r, eval = TRUE}
+db$`NAME_Criterion y _Category1` <- gsub("Work-related attiudes", "Work-related attitudes", db$`NAME_Criterion y _Category1`)
+
+db$`NAME_Criterion y _Category1` <- gsub("Negative Work-Related Intentions & Behaviors", "Negative work-related intentions", db$`NAME_Criterion y _Category1`)
+
+db$`NAME_Criterion y _Category1` <- gsub("Negative Work-related intentions", "Negative work-related intentions", db$`NAME_Criterion y _Category1`)
+
+options(max.print=9000)
+
+#db$Ryy_Criterion[db$Ryy_Criterion > 1]
+#db$Ryy_Criterion[db$Ryy_Criterion < 0]
+
+#db$Rxy[db$Rxy >= abs(1)]
+
+library(naniar)
+db <- db %>% replace_with_na(replace = list(Ryy_Criterion = 1.06))
+db$Rxy[db$Rxy == 6] <- 0.600
+```
+
+## Job & Organizational Resources
+
+```{r, eval = TRUE}
+db$`NAME_Criterion y_specific concept category2` <- gsub("Community Interrelatedness", "Community interrelatedness", db$`NAME_Criterion y_specific concept category2`)
+
+db$`NAME_Criterion y_specific concept category2` <- gsub("Trust & Fairness", "Trust & fairness", db$`NAME_Criterion y_specific concept category2`)
+```
+
+
+```{r, eval = TRUE}
+db_jor <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job & Organizational Resources') 
+
+ma_jor <- cat_mods(data = db_jor, 
+                   moderator = "NAME_Criterion y_specific concept category2",
+                   moderators_name = "NAME_Criterion y_specific concept category2",
+                   cat_mod = T)
+tab_jor <- format_table(ma_jor)
+flextable(tab_jor)
+```
+
+## Job Demands & Stressors
+
+```{r, eval = TRUE}
+db_jds <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Demands & Stressors') 
+
+ma_jds <- cat_mods(data = db_jds, 
+                   moderator = "NAME_Criterion y_specific concept category2",
+                   moderators_name = "NAME_Criterion y_specific concept category2",
+                   cat_mod = T)
+tab_jds <- format_table(ma_jds)
+flextable(tab_jds)
+
+```
+
+## Personal Resources
+
+```{r, eval = TRUE}
+db_pr <- db %>% filter(., `NAME_Criterion y _Category1` == 'Personal Resources') 
+
+ma_pr <- cat_mods(data = db_pr, 
+                   moderator = "NAME_Criterion y_specific concept category2",
+                   moderators_name = "NAME_Criterion y_specific concept category2",
+                   cat_mod = T)
+tab_pr <- format_table(ma_pr)
+flextable(tab_pr)
+```
+
+## Work-related attitudes
+
+```{r, eval = TRUE}
+library(kableExtra)
+library(flextable)
+db_wra <- db %>% filter(., `NAME_Criterion y _Category1` == 'Work-related attitudes') 
+ma_wra <- cat_mods(data = db_wra, 
+                   moderator = "NAME_Criterion y_specific concept category2",
+                   moderators_name = "NAME_Criterion y_specific concept category2",
+                   cat_mod = T)
+data <- ma_wra
+tab_wra <- format_table(ma_wra)
+
+flextable(tab_wra)
+```
+
+## Positive Well-being
+
+
+```{r eval = TRUE}
+db$`NAME_Criterion y_specific concept category2` <- gsub("Life satisaction", "Life satisfaction", db$`NAME_Criterion y_specific concept category2`)
+
+db$`NAME_Criterion y_specific concept category2` <- gsub("Reovery", "Recovery", db$`NAME_Criterion y_specific concept category2`)
+```
+
+```{r, eval = TRUE}
+db_pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Positive Well-being') 
+
+ma_pwb <- cat_mods(data = db_pwb, 
+                   moderator = "NAME_Criterion y_specific concept category2",
+                   moderators_name = "NAME_Criterion y_specific concept category2",
+                   cat_mod = T)
+tab_pwb <- format_table(ma_pwb)
+flextable(tab_pwb)
+```
+
+## Negative Well-being
+
+```{r, eval = TRUE}
+db_nwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative well-being') 
+
+ma_nwb <- cat_mods(data = db_nwb, 
+                   moderator = "NAME_Criterion y_ConceptGroup_Category3",
+                   moderators_name = "NAME_Criterion y_ConceptGroup_Category3",
+                   cat_mod = T)
+tab_nwb <- format_table(ma_nwb)
+flextable(tab_nwb)
+```
+
+## Job Performance
+
+```{r, eval = TRUE}
+db_jp <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Performance') 
+
+ma_jp <- cat_mods(data = db_jp, 
+                   moderator = "NAME_Criterion y_specific concept category2",
+                   moderators_name = "NAME_Criterion y_specific concept category2",
+                   cat_mod = T)
+tab_jp <- format_table(ma_jp)
+flextable(tab_jp)
+```
+
+## Negative work-related intentions
+
+```{r, eval = TRUE}
+db_nwi <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative work-related intentions') 
+
+ma_nwi <- cat_mods(data = db_nwi, 
+                   moderator = "NAME_Criterion y_specific concept category2",
+                   moderators_name = "NAME_Criterion y_specific concept category2",
+                   cat_mod = T)
+tab_nwi <- format_table(ma_nwi)
+flextable(tab_nwi)
+```
+
+# Moderation analyses: Energy scale
+
+```{r, eval = TRUE}
+db1 <- db %>%filter(`NAME_Criterion y _Category1` == "Work-related attitudes") 
+unique(db1$`NAME_Criterion y_specific concept category2`)
+
+
+db <- db %>% mutate(scale_energy_moderator = 
+                      ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 1, "SMVM",
+                             ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 2, "UWES",
+                                    ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 3, "SVS",
+                                           ifelse(`Moderator_Energymeasure_Predictor x - scale code` == 4, "Other", 
+                                                  NA)))))
+```
+
+## Job & Organizational Resources
+
+```{r, eval = TRUE}
+jor <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job & Organizational Resources')
+unique(jor$`NAME_Criterion y_specific concept category2`)
+```
+### Overall
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- jor
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+
+### Climate culture
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Climate culture') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+#flextable(tab_ci_anova)
+```
+
+### Community interrelatedness
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Community interrelatedness') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Job autonomy
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job autonomy') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Leadership
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Leadership') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Learning development opportunities
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Learning development opportunities') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Person-job fit
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Person-job fit') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+#flextable(tab_ci_anova)
+```
+
+### Social support
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Social support') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Other job resources
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Other job resources') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### other organizational resources
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'other organizational resources') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+
+## Job Demands & Stressors
+
+```{r, eval = TRUE}
+jor <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Demands & Stressors')
+unique(jor$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- jor
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+### Cognitive demands
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Cognitive demands') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+#flextable(tab_ci_anova)
+```
+
+### Conflict
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Conflict') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+#flextable(tab_ci_anova)
+```
+
+### Emotional demands
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Emotional demands') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+#flextable(tab_ci_anova)
+```
+
+### Job demands stressors (various, mixed, unsepecified)
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job demands stressors (various, mixed, unsepecified)') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Job insecurity
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job insecurity') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+#flextable(tab_ci_anova)
+```
+
+### Quantitative job demands workload
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Quantitative job demands workload') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Social demands interpersonal aggression leaders
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Social demands interpersonal aggression leaders') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+## Personal Resources
+
+```{r, eval = TRUE}
+jor <- db %>% filter(., `NAME_Criterion y _Category1` == 'Personal Resources')
+unique(jor$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- jor
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Core self-evaluation
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Core self-evaluation') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Employability
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Employability') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+#flextable(tab_ci_anova)
+```
+
+### Mindfulness
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Mindfulness') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Psychological capital
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Mindfulness') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Self-efficacy
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Self-efficacy') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Self-esteem
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Self-esteem') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+
+## Work-related attitudes
+
+
+```{r}
+wra <- db %>% filter(., `NAME_Criterion y _Category1` == 'Work-related attitudes')
+unique(wra$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- wra
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Job satisfaction 
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job satisfaction') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_js_anova)
+```
+
+### Organizational commitment 
+
+```{r, eval = TRUE}
+## Work-related attitudes
+oc <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Organizational commitment') 
+
+ma_oc <- cat_mods_sub(data = oc, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_oc <- format_table(ma_oc[[2]])
+tab_oc_anova <- format_table_anova(ma_oc[[1]])
+
+flextable(tab_oc)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_oc_anova)
+```
+
+
+## Positive Well-being
+
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Positive Well-being')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Overall without detachment
+
+```{r}
+## Work-related attitudes
+
+pwb_nodet <- pwb %>% filter(`NAME_Criterion y_specific concept category2` != "Detachment")
+#unique(pwb_nodet$`NAME_Criterion y_specific concept category2`)
+
+ma_ci <- cat_mods_overall(data = pwb_nodet, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Detachment
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Detachment') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_js_anova)
+```
+
+
+### Life satisfaction
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Life satisfaction') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+```
+#### ANOVA
+```{r, eval = TRUE}
+flextable(tab_js_anova)
+```
+
+
+### Positive affect
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Positive affect') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+```
+
+#### ANOVA
+```{r, eval = TRUE}
+flextable(tab_js_anova)
+```
+
+
+### Psychological well-being
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Psychological well-being') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+```
+
+#### ANOVA
+```{r, eval = TRUE}
+flextable(tab_js_anova)
+```
+
+
+### Recovery
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Recovery') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+## Negative well-being
+
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative well-being')
+unique(pwb$`NAME_Criterion y_ConceptGroup_Category3`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Exhaustion
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Exhaustion') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+```
+
+#### ANOVA
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Cynicism Deperso
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Cynicism Deperso') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+```{r}
+#flextable(tab_js_anova)
+```
+
+
+### Negative psychological well-being various
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Negative psychological well-being various') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+#### ANOVA
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Negative affect
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Negative affect') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Burnout composite or other
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Burnout composite or other') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Reduced efficacy low personal accomplishment
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Reduced efficacy low personal accomplishment') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+```{r}
+#flextable(tab_js_anova)
+```
+
+
+### Physical ill-health
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Physical ill-health') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Sleep complaints
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Sleep complaints') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_js_anova)
+```
+
+
+## Job Performance
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Performance')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Contextual perfromance
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Contextual perfromance') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Task performance
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Task performance') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+## Negative work-related intentions
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative work-related intentions')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### CWB
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'CWB') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Turnover intention
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Turnover intention') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+# Moderation analyses: Study design
+
+```{r, eval = TRUE}
+db <- db %>% mutate(study_design_moderator = 
+                      ifelse(`Moderator Study design_code` == 1, "Cross-sectional",
+                             ifelse(`Moderator Study design_code` == 2, "Multiwave",
+                                    ifelse(`Moderator Study design_code` == 3, "Daily Diary",
+                                                  NA))))
+```
+
+## Job & Organizational Resources
+
+```{r, eval = TRUE}
+jor <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job & Organizational Resources')
+unique(jor$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- jor
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Climate culture
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Climate culture') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+### Community interrelatedness
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Community interrelatedness') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Job autonomy
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job autonomy') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Leadership
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Leadership') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Learning development opportunities
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Learning development opportunities') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+### Person-job fit
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Person-job fit') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Social support
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Social support') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Other job resources
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Other job resources') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+```{r}
+#tab_ci_anova 
+```
+
+
+### other organizational resources
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'other organizational resources') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+## Job Demands & Stressors
+
+```{r, eval = TRUE}
+jor <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Demands & Stressors')
+unique(jor$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- jor
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+### Cognitive demands
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Cognitive demands') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+### Conflict
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Conflict') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+### Emotional demands
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Emotional demands') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+### Job demands stressors (various, mixed, unsepecified)
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job demands stressors (various, mixed, unsepecified)') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Job insecurity
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job insecurity') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Quantitative job demands workload
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Quantitative job demands workload') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Social demands interpersonal aggression leaders
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Social demands interpersonal aggression leaders') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+## Personal Resources
+
+```{r, eval = TRUE}
+jor <- db %>% filter(., `NAME_Criterion y _Category1` == 'Personal Resources')
+unique(jor$`NAME_Criterion y_specific concept category2`)
+```
+
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- jor
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+### Core self-evaluation
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Core self-evaluation') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Employability
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Employability') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Mindfulness
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Mindfulness') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+### Psychological capital
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Mindfulness') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+### Self-efficacy
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Self-efficacy') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_ci_anova)
+```
+
+
+### Self-esteem
+
+```{r, eval = TRUE}
+## Work-related attitudes
+ci <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Self-esteem') 
+
+ma_ci <- cat_mods_sub(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+#tab_ci_anova <- format_table_anova(ma_ci[[1]])
+
+flextable(tab_ci)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_ci_anova)
+```
+
+
+
+## Work-related attitudes
+
+```{r}
+wra <- db %>% filter(., `NAME_Criterion y _Category1` == 'Work-related attitudes')
+unique(wra$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- wra
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+
+### Job satisfaction 
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job satisfaction') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+tab_js_anova 
+```
+
+
+### Organizational commitment 
+
+```{r, eval = TRUE}
+## Work-related attitudes
+oc <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Organizational commitment') 
+
+ma_oc <- cat_mods_sub(data = oc, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_oc <- format_table(ma_oc[[2]])
+#tab_oc_anova <- format_table_anova(ma_oc[[1]])
+
+flextable(tab_oc)
+
+```
+
+
+#### ANOVA
+
+```{r}
+#flextable(tab_oc_anova)
+```
+
+
+
+## Positive Well-being
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Positive Well-being')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Overall without detachment
+
+```{r}
+## Work-related attitudes
+
+pwb_nodet <- pwb %>% filter(`NAME_Criterion y_specific concept category2` != "Detachment")
+#unique(pwb_nodet$`NAME_Criterion y_specific concept category2`)
+
+ma_ci <- cat_mods_overall(data = pwb_nodet, 
+                   moderator = "scale_energy_moderator",
+                   moderators_name = "scale_energy_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Detachment
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Detachment') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA 
+
+```{r, eval = TRUE}
+tab_js_anova
+```
+
+
+
+### Life satisfaction
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Life satisfaction') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+#### ANOVA
+
+```{r}
+#tab_js_anova
+```
+
+
+### Positive affect
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Positive affect') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Psychological well-being
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Psychological well-being') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Recovery
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Recovery') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+## Negative well-being
+
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative well-being')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Exhaustion
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Exhaustion') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Cynicism Deperso
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Cynicism Deperso') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Negative psychological well-being various
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Cynicism Deperso') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Negative affect
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Negative affect') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Burnout composite or other
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Burnout composite or other') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_js_anova)
+```
+
+
+### Reduced efficacy low personal accomplishment
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Reduced efficacy low personal accomplishment') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Physical ill-health
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Physical ill-health') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_js_anova)
+```
+
+
+### Sleep complaints
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Sleep complaints') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+#flextable(tab_js_anova)
+```
+
+## Job Performance
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Performance')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Contextual performance
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Contextual perfromance') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Task performance
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Task performance') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+## Negative work-related intentions
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative work-related intentions')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### CWB
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'CWB') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Turnover intention
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Turnover intention') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "study_design_moderator",
+                   moderators_name = "study_design_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+#tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA 
+
+```{r}
+#flextable(tab_js_anova)
+```
+
+
+# Moderation analyses: Rating (for Criterion Performance only)
+
+```{r, eval = TRUE}
+db <- db %>% mutate(rating_moderator = 
+                      ifelse(`Moderator Study design_code` == 1, "self-rated",
+                             ifelse(`Moderator Study design_code` == 2, "other-rating",
+                                    ifelse(`Moderator Study design_code` == 3, "other",
+                                                  NA))))
+```
+
+## Job Performance
+
+```{r}
+pwb <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Performance')
+unique(pwb$`NAME_Criterion y_specific concept category2`)
+```
+
+### Overall
+
+```{r}
+## Work-related attitudes
+ci <- pwb
+
+ma_ci <- cat_mods_overall(data = ci, 
+                   moderator = "rating_moderator",
+                   moderators_name = "rating_moderator",
+                   cat_mod = T)
+tab_ci <- format_table(ma_ci[[2]])
+tab_ci_anova <- format_table_anova(ma_ci[[1]])
+flextable(tab_ci)
+```
+
+#### ANOVA
+
+```{r, eval = TRUE}
+flextable(tab_ci_anova)
+```
+
+### Contextual performance
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Contextual perfromance') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "rating_moderator",
+                   moderators_name = "rating_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+flextable(tab_js_anova)
+```
+
+
+### Task performance
+
+```{r, eval = TRUE}
+## Work-related attitudes
+js <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Task performance') 
+
+ma_js <- cat_mods_sub(data = js, 
+                   moderator = "rating_moderator",
+                   moderators_name = "rating_moderator",
+                   cat_mod = T)
+tab_js <- format_table(ma_js[[2]])
+tab_js_anova <- format_table_anova(ma_js[[1]])
+
+flextable(tab_js)
+
+```
+
+#### ANOVA
+
+```{r}
+tab_js_anova
+```
+
+
+# Sensitivity analyses
+
+## Job & Organizational Resources
+
+```{r, eval = FALSE}
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job & Organizational Resources')
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Job_Organizational_Resources.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+getwd()
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Climate culture') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Climate_culture.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Community interrelatedness') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Community_interrelatedness.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job autonomy') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Job_autonomy.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Leadership') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Leadership.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Learning development opportunities') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Learning_development_opportunities.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Person-job fit') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Person_job_fit.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Social support') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Social_support.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Other job resources') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_Other_job_resources.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'other organizational resources') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_and_Organizational_Resources/cum_other_organizational_resources.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+```
+## Job Demands & Stressors
+
+```{r, eval = FALSE}
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Demands & Stressors') 
+
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Job_Demands_Stressors.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Quantitative job demands workload') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Quantitative_job_demands_workload.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Emotional demands') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Emotional_demands.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Cognitive demands') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Cognitive_demands.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job demands stressors (various, mixed, unsepecified)') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Job_demands_stressors_mixedl.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job insecurity') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Job_insecurity.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Social demands interpersonal aggression leaders') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Social_demands_interpersonal_aggression_leaders.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Conflict') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Demands_Stressors/cum_Conflict.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+```
+
+## Personal Resources
+```{r, eval = FALSE}
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Personal Resources')
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Personal_Resources/cum_Personal_Resources.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Mindfulness') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Personal_Resources/cum_Mindfulness.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Psychological capital') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Personal_Resources/cum_Psychological_capital.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Self-efficacy') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Personal_Resources/cum_Self_efficacy.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Self-esteem') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Personal_Resources/cum_Self_esteem.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Core self-evaluation') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Personal_Resources/cum_Core_self_evaluation.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Employability') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Personal_Resources/cum_Employability.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+```
+
+## Work-related attitudes
+
+```{r, eval = FALSE}
+
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Work-related attitudes') 
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Work_related_attitudes/cum_Work_related_attitudes.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Job satisfaction') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Work_related_attitudes/cum_Job satisfaction.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Organizational commitment') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Work_related_attitudes/cum_Organizational_commitment.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+```
+
+## Positive Well-being
+
+```{r, eval = FALSE}
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Positive Well-being') 
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Positive_well_being/cum_Positive_Well_being.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Psychological well-being') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Positive_well_being/cum_Psychological well-being.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Recovery') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Positive_well_being/cum_Recovery.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Positive affect') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Positive_well_being/cum_Positive_affect.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Detachment') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Positive_well_being/cum_Detachment.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Life satisfaction') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Positive_well_being/cum_Life_satisfaction.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+```
+
+## Negative well-being
+
+```{r, eval = FALSE}
+
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative well-being') 
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Negative_well_being.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Exhaustion') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Exhaustion.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Cynicism Deperso') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Cynicism Deperso.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Negative psychological well-being various') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Negative_psychological_well_being_various.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Negative affect') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Negative_affect.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Burnout composite or other') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Burnout_composite_or_other.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Reduced efficacy low personal accomplishment') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Reduced_efficacy_low_personal_accomplishment.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Physical ill-health') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Physical_ill_health.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_ConceptGroup_Category3` == 'Sleep complaints') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_well_being/cum_Sleep_complaints.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+```
+
+## Job Performance
+
+```{r, eval = FALSE}
+
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Job Performance')
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Job_Performance/cum_Job_Performance.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Contextual perfromance') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Performance/cum_Contextual_perfromance.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Task performance') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Job_Performance/cum_Task_performance.pdf",   # The directory you want to save the file in
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+```
+
+## Negative work-related intentions
+
+```{r, eval = FALSE}
+
+db_cum <- db %>% filter(., `NAME_Criterion y _Category1` == 'Negative work-related intentions') 
+cum <- cum_plots_overall(db_cum)
+pdf(file = "Cumulative_plots/Negative_work_related_intentions/cum_Negative_work_related_intentions.pdf",   # The directory you want to save the file i
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'CWB') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_work_related_intentions/cum_CWB.pdf",   # The directory you want to save the file i
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+
+db_cum <- db %>% filter(., `NAME_Criterion y_specific concept category2` == 'Turnover intention') 
+cum <- cum_plots(db_cum)
+pdf(file = "Cumulative_plots/Negative_work_related_intentions/cum_Turnover_intention.pdf",   # The directory you want to save the file i
+    width = 4, # The width of the plot in inches
+    height = 4) # The height of the plot in inches
+cum
+dev.off()
+```
+
+# References
+
+::: {#refs custom-style="Bibliography"}
+:::
