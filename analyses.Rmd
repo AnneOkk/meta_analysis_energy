@@ -11,14 +11,14 @@ execute:
 prefer-html: true
 author: "Anne-Kathrin Kleine"
 output: 
-  word_document:
-    reference_docx: "config/template_word.docx"
-  #html_document:
-    #toc: true
-    #toc-depth: 3
-    #toc_float: true
-    #toc_collapsed: true
-    #number_sections: true
+  #word_document:
+    #reference_docx: "config/template_word.docx"
+  html_document:
+    toc: true
+    toc-depth: 3
+    toc_float: true
+    toc_collapsed: true
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -50,6 +50,25 @@ source("R/custom-functions.R")
 db <- db %>% filter(`Filter_Full paper (1 = excl; 2 = incl)` == 2)
 ```
 
+```{r, eval = TRUE}
+db$`NAME_Criterion y _Category1` <- gsub("Work-related attiudes", "Work-related attitudes", db$`NAME_Criterion y _Category1`)
+
+db$`NAME_Criterion y _Category1` <- gsub("Negative Work-Related Intentions & Behaviors", "Negative work-related intentions", db$`NAME_Criterion y _Category1`)
+
+db$`NAME_Criterion y _Category1` <- gsub("Negative Work-related intentions", "Negative work-related intentions", db$`NAME_Criterion y _Category1`)
+
+options(max.print=9000)
+
+#db$Ryy_Criterion[db$Ryy_Criterion > 1]
+#db$Ryy_Criterion[db$Ryy_Criterion < 0]
+
+#db$Rxy[db$Rxy >= abs(1)]
+
+library(naniar)
+db <- db %>% replace_with_na(replace = list(Ryy_Criterion = 1.06))
+db$Rxy[db$Rxy == 6] <- 0.600
+```
+
 # Descriptives
 
 ```{r}
@@ -66,14 +85,22 @@ db <- db %>% mutate(scale_energy_moderator =
 overall_k <- nrow(count(db, Number))
 db_red <- db[!duplicated(db[,'Number' ]),]
 
+counted <- db %>% group_by(Title) %>% dplyr::summarise(count = n_distinct(`NAME_Criterion y _Category1`)) 
+effect_sizes_c1 <- sum(counted$count)
+
+counted <- db %>% group_by(Title) %>% dplyr::summarise(count = n_distinct(`NAME_Criterion y_specific concept category2`)) 
+effect_sizes_c2 <- sum(counted$count)
+
 overall_N <- sum(db_red$`N_Sample Size`, na.rm = T)
 ```
 
-Overall *k* = `r overall_k`; Overall *N* = `r overall_N`.
+Our quantitative summary of the relationship between energy and the variables presented in the theoretical model is based on `r effect_sizes_c1` effect sizes (`r effect_sizes_c2` effect sizes on the lower category level), derived from *k* = `r overall_k` studies, representing *N* = `r overall_N` individuals.
+
 
 ```{r}
 flextable(count(db, scale_energy_moderator))
 ```
+
 
 ```{r}
 range_low <- range(db$`N_Sample Size`, na.rm = T)[1]
@@ -150,24 +177,7 @@ To assess whether studies with lower precision could substantially alter the res
 # 8) Negative work-related intentions and behaviors
 ```
 
-```{r, eval = TRUE}
-db$`NAME_Criterion y _Category1` <- gsub("Work-related attiudes", "Work-related attitudes", db$`NAME_Criterion y _Category1`)
 
-db$`NAME_Criterion y _Category1` <- gsub("Negative Work-Related Intentions & Behaviors", "Negative work-related intentions", db$`NAME_Criterion y _Category1`)
-
-db$`NAME_Criterion y _Category1` <- gsub("Negative Work-related intentions", "Negative work-related intentions", db$`NAME_Criterion y _Category1`)
-
-options(max.print=9000)
-
-#db$Ryy_Criterion[db$Ryy_Criterion > 1]
-#db$Ryy_Criterion[db$Ryy_Criterion < 0]
-
-#db$Rxy[db$Rxy >= abs(1)]
-
-library(naniar)
-db <- db %>% replace_with_na(replace = list(Ryy_Criterion = 1.06))
-db$Rxy[db$Rxy == 6] <- 0.600
-```
 
 ## Job & Organizational Resources
 
